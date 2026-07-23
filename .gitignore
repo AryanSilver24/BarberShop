@@ -1,0 +1,20 @@
+# ══════════════════════════════════════════
+#  Iron & Edge — .gitignore
+#  Files listed here will NEVER be uploaded
+#  to GitHub — keeping your secrets safe
+# ══════════════════════════════════════════
+
+# ⚠️  PRIVATE CONFIG — contains real passwords & URLs
+config.js
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor folders
+.vscode/
+.idea/
+
+# Logs
+*.log
