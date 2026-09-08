@@ -1374,12 +1374,12 @@
   dateInput.setAttribute('min', today);
 
   // ─── Loaded from config.js (not on GitHub) ───
-  const APPS_SCRIPT_URL = (typeof CONFIG !== 'undefined' && CONFIG.APPS_SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE')
+  const APPS_SCRIPT_URL = (typeof CONFIG !== 'undefined' && CONFIG.APPS_SCRIPT_URL && CONFIG.APPS_SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE' && CONFIG.APPS_SCRIPT_URL !== 'PASTE_YOUR_APPS_SCRIPT_URL_HERE')
     ? CONFIG.APPS_SCRIPT_URL
-    : null;
-  const REVIEW_SCRIPT_URL = (typeof CONFIG !== 'undefined' && CONFIG.REVIEW_SCRIPT_URL !== 'YOUR_REVIEW_GOOGLE_APPS_SCRIPT_URL_HERE')
+    : 'https://script.google.com/macros/s/AKfycbz2U5e6QdoVi80QGdIJMtLaucYnkwd5N7lFL35JQLaqtxBy9gdbix1n1dWkZCKYZJr4Eg/exec';
+  const REVIEW_SCRIPT_URL = (typeof CONFIG !== 'undefined' && CONFIG.REVIEW_SCRIPT_URL && CONFIG.REVIEW_SCRIPT_URL !== 'YOUR_REVIEW_GOOGLE_APPS_SCRIPT_URL_HERE')
     ? CONFIG.REVIEW_SCRIPT_URL
-    : null;
+    : 'https://script.google.com/macros/s/AKfycbz7i7AgVkV2n5yGZblwVXoRgo1JNUjHvPHhylypcRO_jka8g9OJmqogYi9JwCUqBeAhMw/exec';
 
   async function handleBooking() {
     const fname    = document.getElementById('fname').value.trim();
