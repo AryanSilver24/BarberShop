@@ -54,9 +54,14 @@
     <!-- Stats -->
     <div class="stats-row">
       <div class="stat-card">
+        <div class="stat-label">Earned Revenue</div>
+        <div class="stat-value" id="statRevenue" style="color:var(--gold);">$0</div>
+        <div class="stat-sub" id="statRevenueSub">From Completed Cuts</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-label">Total Bookings</div>
         <div class="stat-value" id="statTotal">—</div>
-        <div class="stat-sub">All time</div>
+        <div class="stat-sub">Active Count</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Today</div>
@@ -75,8 +80,38 @@
       </div>
     </div>
 
+    <!-- Revenue Analytics -->
+    <div class="revenue-analytics-card">
+      <div class="analytics-header">
+        <h3>💈 Earnings & Revenue Breakdown</h3>
+        <span class="analytics-badge" id="revenueSubtext">Barber Performance</span>
+      </div>
+      <div class="barbers-revenue-grid">
+        <div class="barber-revenue-card">
+          <div class="barber-revenue-name">Marcus Reeves</div>
+          <div class="barber-revenue-val" id="revMarcus">$0</div>
+          <div class="barber-revenue-sub" id="countMarcus">0 Bookings</div>
+        </div>
+        <div class="barber-revenue-card">
+          <div class="barber-revenue-name">Danny Kowalski</div>
+          <div class="barber-revenue-val" id="revDanny">$0</div>
+          <div class="barber-revenue-sub" id="countDanny">0 Bookings</div>
+        </div>
+        <div class="barber-revenue-card">
+          <div class="barber-revenue-name">Yusuf Ali</div>
+          <div class="barber-revenue-val" id="revYusuf">$0</div>
+          <div class="barber-revenue-sub" id="countYusuf">0 Bookings</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Toolbar -->
     <div class="toolbar">
+      <select class="filter-select" id="filterStatus" onchange="renderTable()">
+        <option value="active">Active Bookings</option>
+        <option value="completed" id="optCompleted">Completed Bookings (0)</option>
+        <option value="all">All Bookings</option>
+      </select>
       <input type="text" class="search-box" id="searchBox" placeholder="Search by name, email, service…" oninput="renderTable()" />
       <select class="filter-select" id="filterBarber" onchange="renderTable()">
         <option value="">All Barbers</option>
@@ -92,7 +127,6 @@
         <option value="month">This Month</option>
       </select>
       <button class="refresh-btn" id="refreshBtn" onclick="loadBookings()">⟳ Refresh</button>
-      <button class="restore-btn" id="restoreBtn" onclick="restoreCompletedBookings()" style="display:none">Restore Completed (0)</button>
     </div>
 
     <!-- Status -->

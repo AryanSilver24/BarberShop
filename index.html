@@ -355,6 +355,28 @@
             <option>7:00 PM</option>
           </select>
         </div>
+        <div class="form-group">
+          <label>Promo Code</label>
+          <div class="promo-input-wrap">
+            <input type="text" id="promoCode" placeholder="Try FIRST10, IRON20, BARBER5" style="text-transform:uppercase" />
+            <button type="button" class="promo-apply-btn" onclick="applyPromoCode()">Apply</button>
+          </div>
+          <div id="promoFeedback" class="promo-feedback"></div>
+        </div>
+        <div id="priceSummary" class="price-summary" style="display:none">
+          <div class="price-row">
+            <span>Base Price:</span>
+            <span id="summaryBasePrice">$0</span>
+          </div>
+          <div class="price-row discount-row" id="summaryDiscountRow" style="display:none">
+            <span>Discount (<span id="summaryPromoName"></span>):</span>
+            <span id="summaryDiscountAmount">-$0</span>
+          </div>
+          <div class="price-row total-row">
+            <span>Total:</span>
+            <span id="summaryTotalPrice">$0</span>
+          </div>
+        </div>
         <button class="form-submit" onclick="handleBooking()">Confirm Booking</button>
       </div>
       <div class="success-msg" id="successMsg">

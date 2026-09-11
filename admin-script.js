@@ -96,32 +96,58 @@ function markCompleted(id, name, bookedAt) {
   renderTable();
 }
 
-function restoreCompletedBookings() {
-  if (confirm('Restore all completed bookings back to the active list?')) {
-    localStorage.removeItem('completedBookings');
-    computeStats();
-    renderTable();
-  }
+function restoreSingleCompleted(id, name, bookedAt) {
+  const key = id || (name + '_' + bookedAt);
+  let completed = getCompletedKeys();
+  completed = completed.filter(k => k !== key);
+  localStorage.setItem('completedBookings', JSON.stringify(completed));
+  computeStats();
+  renderTable();
 }
 
 function updateRestoreButton() {
-  const btn = document.getElementById('restoreBtn');
-  if (!btn) return;
   const count = getCompletedKeys().length;
-  if (count > 0) {
-    btn.style.display = 'inline-block';
-    btn.textContent = `Restore Completed (${count})`;
-  } else {
-    btn.style.display = 'none';
+  const optCompleted = document.getElementById('optCompleted');
+  if (optCompleted) {
+    optCompleted.textContent = `Completed Bookings (${count})`;
   }
 }
 
-// ─── STATS ────────────────────────────────────────────────────
+const SERVICE_PRICES = {
+  'Classic Haircut': 35,
+  'Hot Towel Shave': 45,
+  'Skin Fade': 40,
+  'Beard Shape & Trim': 25,
+  'Cut & Shave Combo': 70,
+  'Kids\' Cut': 22
+};
+
+function getBookingPrice(b) {
+  if (b['finalPrice'] !== undefined && !isNaN(b['finalPrice'])) return Number(b['finalPrice']);
+  if (b['Price'] !== undefined && !isNaN(b['Price'])) return Number(b['Price']);
+  
+  const rawService = b['Service'] || '';
+  const match = rawService.match(/\$(\d+)/);
+  if (match) return parseInt(match[1]);
+
+  const cleanService = rawService.split('—')[0].trim();
+  return SERVICE_PRICES[cleanService] || 35;
+}
+
+// ─── STATS & REVENUE ANALYTICS ──────────────────────────────────
 function computeStats() {
   const completedKeys = getCompletedKeys();
-  const activeBookings = allBookings.filter(b => {
+
+  const activeBookings = [];
+  const completedBookings = [];
+
+  allBookings.forEach(b => {
     const key = b['ID'] || ((b['Name']||'') + '_' + (b['Booked At']||''));
-    return !completedKeys.includes(key);
+    if (completedKeys.includes(key)) {
+      completedBookings.push(b);
+    } else {
+      activeBookings.push(b);
+    }
   });
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -134,16 +160,69 @@ function computeStats() {
     const bookedAt = new Date(b['Booked At']);
     if (b['Date'] === todayStr) todayCount++;
     if (bookedAt >= weekAgo) weekCount++;
-    const svc = (b['Service'] || '').split('—')[0].trim();
-    serviceCounts[svc] = (serviceCounts[svc] || 0) + 1;
+
+    const svcName = (b['Service'] || '').split('—')[0].trim();
+    serviceCounts[svcName] = (serviceCounts[svcName] || 0) + 1;
   });
+
+  let earnedRevenue = 0;
+  let pendingRevenue = 0;
+  const barberRev = {
+    'Marcus Reeves': { rev: 0, count: 0 },
+    'Danny Kowalski': { rev: 0, count: 0 },
+    'Yusuf Ali': { rev: 0, count: 0 }
+  };
+
+  allBookings.forEach(b => {
+    const price = getBookingPrice(b);
+    const key = b['ID'] || ((b['Name']||'') + '_' + (b['Booked At']||''));
+    const isCompleted = completedKeys.includes(key);
+
+    if (isCompleted) {
+      earnedRevenue += price;
+    } else {
+      pendingRevenue += price;
+    }
+
+    const barberName = b['Barber'] || 'Any';
+    if (barberRev[barberName]) {
+      if (completedBookings.length > 0) {
+        if (isCompleted) {
+          barberRev[barberName].rev += price;
+          barberRev[barberName].count += 1;
+        }
+      } else {
+        barberRev[barberName].rev += price;
+        barberRev[barberName].count += 1;
+      }
+    }
+  });
+
+  const hasCompleted = completedBookings.length > 0;
+  const displayRevenue = hasCompleted ? earnedRevenue : (earnedRevenue + pendingRevenue);
+  const revenueSub = hasCompleted 
+    ? `${completedBookings.length} Completed ($${pendingRevenue} pending)` 
+    : `Total Potential Pipeline`;
 
   const topService = Object.entries(serviceCounts).sort((a,b) => b[1]-a[1])[0];
 
+  document.getElementById('statRevenue').textContent = `$${displayRevenue.toLocaleString()}`;
+  document.getElementById('statRevenueSub').textContent = revenueSub;
   document.getElementById('statTotal').textContent  = activeBookings.length;
   document.getElementById('statToday').textContent  = todayCount;
   document.getElementById('statWeek').textContent   = weekCount;
   document.getElementById('statTopService').textContent = topService ? topService[0] : '—';
+
+  // Update Barber Revenue Analytics Cards
+  if (document.getElementById('revMarcus')) {
+    const subLabel = hasCompleted ? 'Completed Cuts' : 'Active Bookings';
+    document.getElementById('revMarcus').textContent = `$${barberRev['Marcus Reeves'].rev}`;
+    document.getElementById('countMarcus').textContent = `${barberRev['Marcus Reeves'].count} ${subLabel}`;
+    document.getElementById('revDanny').textContent = `$${barberRev['Danny Kowalski'].rev}`;
+    document.getElementById('countDanny').textContent = `${barberRev['Danny Kowalski'].count} ${subLabel}`;
+    document.getElementById('revYusuf').textContent = `$${barberRev['Yusuf Ali'].rev}`;
+    document.getElementById('countYusuf').textContent = `${barberRev['Yusuf Ali'].count} ${subLabel}`;
+  }
 }
 
 // ─── RENDER TABLE ─────────────────────────────────────────────
@@ -151,6 +230,7 @@ function renderTable() {
   const q      = document.getElementById('searchBox').value.toLowerCase();
   const barber = document.getElementById('filterBarber').value;
   const dRange = document.getElementById('filterDate').value;
+  const statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : 'active';
   const todayStr = new Date().toISOString().split('T')[0];
   const weekAgo  = new Date(Date.now() - 7*24*60*60*1000);
   const monthAgo = new Date(Date.now() - 30*24*60*60*1000);
@@ -158,7 +238,10 @@ function renderTable() {
 
   filtered = allBookings.filter(b => {
     const key = b['ID'] || ((b['Name']||'') + '_' + (b['Booked At']||''));
-    if (completedKeys.includes(key)) return false;
+    const isCompleted = completedKeys.includes(key);
+
+    if (statusFilter === 'active' && isCompleted) return false;
+    if (statusFilter === 'completed' && !isCompleted) return false;
 
     const search = (b['Name']||'') + (b['Email']||'') + (b['Service']||'');
     if (q && !search.toLowerCase().includes(q)) return false;
@@ -190,10 +273,11 @@ function renderPage() {
   const tbody = document.getElementById('tableBody');
   const start = (currentPage - 1) * PER_PAGE;
   const rows  = filtered.slice(start, start + PER_PAGE);
+  const completedKeys = getCompletedKeys();
 
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:3rem;color:var(--muted)">
-      <div class="empty-icon">📭</div>No active bookings match your filters.</td></tr>`;
+      <div class="empty-icon">📭</div>No bookings match your selected view/filters.</td></tr>`;
     return;
   }
 
@@ -203,6 +287,17 @@ function renderPage() {
     const idVal    = esc(b['ID']||'');
     const nameVal  = esc(b['Name']||'');
     const bookedVal= esc(b['Booked At']||'');
+    const key      = b['ID'] || ((b['Name']||'') + '_' + (b['Booked At']||''));
+    const isCompleted = completedKeys.includes(key);
+
+    const actionCell = isCompleted 
+      ? `<span class="completed-badge">✓ Completed</span>
+         <button class="restore-row-btn" onclick="restoreSingleCompleted('${idVal}', '${nameVal}', '${bookedVal}')">
+           ↺ Restore
+         </button>`
+      : `<button class="complete-btn" onclick="markCompleted('${idVal}', '${nameVal}', '${bookedVal}')">
+           ✓ Mark Completed
+         </button>`;
 
     return `<tr>
       <td class="td-id">${idVal || '—'}</td>
@@ -211,11 +306,7 @@ function renderPage() {
       <td class="td-email">${esc(b['Email']||'—')}</td>
       <td class="td-service">${esc(service)}</td>
       <td>${esc(b['Barber']||'—')}</td>
-      <td>
-        <button class="complete-btn" onclick="markCompleted('${idVal}', '${nameVal}', '${bookedVal}')">
-          ✓ Mark Completed
-        </button>
-      </td>
+      <td>${actionCell}</td>
     </tr>`;
   }).join('');
 }

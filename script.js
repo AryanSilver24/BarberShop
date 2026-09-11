@@ -29,6 +29,109 @@ const REVIEW_SCRIPT_URL = (typeof CONFIG !== 'undefined' && CONFIG.REVIEW_SCRIPT
   ? CONFIG.REVIEW_SCRIPT_URL
   : 'https://script.google.com/macros/s/AKfycbz7i7AgVkV2n5yGZblwVXoRgo1JNUjHvPHhylypcRO_jka8g9OJmqogYi9JwCUqBeAhMw/exec';
 
+// ─── PROMO CODE & PRICING LOGIC ───
+let activePromo = null;
+
+const PROMO_CODES = {
+  'FIRST10': { type: 'percent', value: 10, label: '10% OFF' },
+  'IRON20': { type: 'amount', value: 20, min: 40, label: '$20 OFF' },
+  'EDGE50': { type: 'percent', value: 50, label: '50% OFF VIP' },
+  'BARBER5': { type: 'amount', value: 5, label: '$5 OFF' }
+};
+
+function getServiceBasePrice(serviceStr) {
+  if (!serviceStr) return 0;
+  const match = serviceStr.match(/\$(\d+)/);
+  return match ? parseInt(match[1]) : 0;
+}
+
+function updatePriceSummary() {
+  const serviceSelect = document.getElementById('service');
+  const priceSummary = document.getElementById('priceSummary');
+  if (!serviceSelect || !priceSummary) return;
+
+  const basePrice = getServiceBasePrice(serviceSelect.value);
+  if (basePrice <= 0) {
+    priceSummary.style.display = 'none';
+    return;
+  }
+
+  priceSummary.style.display = 'flex';
+  document.getElementById('summaryBasePrice').textContent = `$${basePrice}`;
+
+  let discount = 0;
+  const discountRow = document.getElementById('summaryDiscountRow');
+
+  if (activePromo) {
+    const promo = PROMO_CODES[activePromo];
+    if (promo) {
+      if (promo.min && basePrice < promo.min) {
+        discountRow.style.display = 'none';
+      } else {
+        if (promo.type === 'percent') {
+          discount = Math.round((basePrice * promo.value) / 100);
+        } else if (promo.type === 'amount') {
+          discount = Math.min(basePrice, promo.value);
+        }
+        discountRow.style.display = 'flex';
+        document.getElementById('summaryPromoName').textContent = activePromo;
+        document.getElementById('summaryDiscountAmount').textContent = `-$${discount}`;
+      }
+    }
+  } else {
+    discountRow.style.display = 'none';
+  }
+
+  const finalPrice = Math.max(0, basePrice - discount);
+  document.getElementById('summaryTotalPrice').textContent = `$${finalPrice}`;
+}
+
+function applyPromoCode() {
+  const codeInput = document.getElementById('promoCode');
+  const feedback = document.getElementById('promoFeedback');
+  const serviceSelect = document.getElementById('service');
+
+  if (!codeInput || !feedback) return;
+  const code = codeInput.value.trim().toUpperCase();
+
+  if (!code) {
+    activePromo = null;
+    feedback.className = 'promo-feedback error';
+    feedback.textContent = 'Please enter a promo code.';
+    updatePriceSummary();
+    return;
+  }
+
+  const basePrice = getServiceBasePrice(serviceSelect ? serviceSelect.value : '');
+
+  if (!PROMO_CODES[code]) {
+    activePromo = null;
+    feedback.className = 'promo-feedback error';
+    feedback.textContent = 'Invalid promo code. Try FIRST10, IRON20, or BARBER5.';
+    updatePriceSummary();
+    return;
+  }
+
+  const promo = PROMO_CODES[code];
+  if (promo.min && basePrice > 0 && basePrice < promo.min) {
+    activePromo = null;
+    feedback.className = 'promo-feedback error';
+    feedback.textContent = `Code ${code} requires a service price of at least $${promo.min}.`;
+    updatePriceSummary();
+    return;
+  }
+
+  activePromo = code;
+  feedback.className = 'promo-feedback success';
+  feedback.textContent = `✓ Promo code ${code} (${promo.label}) applied!`;
+  updatePriceSummary();
+}
+
+const serviceSelectElem = document.getElementById('service');
+if (serviceSelectElem) {
+  serviceSelectElem.addEventListener('change', updatePriceSummary);
+}
+
 async function handleBooking() {
   const fname    = document.getElementById('fname').value.trim();
   const lname    = document.getElementById('lname').value.trim();
@@ -52,6 +155,16 @@ async function handleBooking() {
   submitBtn.disabled = true;
   clearFormError();
 
+  const basePrice = getServiceBasePrice(service);
+  let discount = 0;
+  if (activePromo && PROMO_CODES[activePromo]) {
+    const p = PROMO_CODES[activePromo];
+    if (!p.min || basePrice >= p.min) {
+      discount = p.type === 'percent' ? Math.round((basePrice * p.value)/100) : Math.min(basePrice, p.value);
+    }
+  }
+  const finalPrice = Math.max(0, basePrice - discount);
+
   const payload = {
     name: fname + ' ' + lname,
     email,
@@ -59,6 +172,10 @@ async function handleBooking() {
     barber,
     date,
     time,
+    basePrice,
+    promoCode: activePromo || 'NONE',
+    discountAmount: discount,
+    finalPrice,
     bookedAt: new Date().toISOString()
   };
 
