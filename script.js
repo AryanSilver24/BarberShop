@@ -133,13 +133,13 @@ if (serviceSelectElem) {
 }
 
 async function handleBooking() {
-  const fname    = document.getElementById('fname').value.trim();
-  const lname    = document.getElementById('lname').value.trim();
-  const email    = document.getElementById('email').value.trim();
-  const service  = document.getElementById('service').value;
-  const barber   = document.getElementById('barber').value || 'Any';
-  const date     = document.getElementById('date').value;
-  const time     = document.getElementById('time').value;
+  const fname = document.getElementById('fname').value.trim();
+  const lname = document.getElementById('lname').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const service = document.getElementById('service').value;
+  const barber = document.getElementById('barber').value || 'Any';
+  const date = document.getElementById('date').value;
+  const time = document.getElementById('time').value;
 
   if (!fname || !email || !service || !date || !time) {
     showFormError('Please fill in all required fields before confirming.');
@@ -160,7 +160,7 @@ async function handleBooking() {
   if (activePromo && PROMO_CODES[activePromo]) {
     const p = PROMO_CODES[activePromo];
     if (!p.min || basePrice >= p.min) {
-      discount = p.type === 'percent' ? Math.round((basePrice * p.value)/100) : Math.min(basePrice, p.value);
+      discount = p.type === 'percent' ? Math.round((basePrice * p.value) / 100) : Math.min(basePrice, p.value);
     }
   }
   const finalPrice = Math.max(0, basePrice - discount);
@@ -257,23 +257,41 @@ let testimonials = [...getLocalReviews(), ...defaultTestimonials];
 const reviewsPerPage = 3;
 let currentPage = 1;
 
-// LOAD REVIEWS FROM GOOGLE SHEETS
+// LOAD REVIEWS FROM GOOGLE SHEETS & CLOUD
 async function fetchReviews() {
   try {
     const response = await fetch(REVIEW_SCRIPT_URL);
+    if (!response.ok) throw new Error("Network error " + response.status);
     const data = await response.json();
+    
     if (Array.isArray(data) && data.length > 0) {
-      const remote = data.reverse();
+      const remote = data.map(r => ({
+        name: r.name || r.Name || 'Client',
+        rating: parseInt(r.rating || r.Rating || 5),
+        text: r.text || r.Text || ''
+      })).filter(r => r.text);
+
       const local = getLocalReviews();
-      testimonials = [...local, ...remote.filter(r => !local.some(l => l.name === r.name && l.text === r.text))];
-      loadReviews(1);
+      const remoteReversed = [...remote].reverse();
+      
+      const uniqueRemote = remoteReversed.filter(rem => 
+        !local.some(loc => loc.name === rem.name && loc.text === rem.text)
+      );
+      
+      const uniqueDefaults = defaultTestimonials.filter(d => 
+        !local.some(loc => loc.text === d.text) && !uniqueRemote.some(rem => rem.text === d.text)
+      );
+      
+      testimonials = [...local, ...uniqueRemote, ...uniqueDefaults];
+      loadReviews(currentPage);
     } else {
-      loadReviews(1);
+      loadReviews(currentPage);
     }
   } catch (err) {
-    loadReviews(1);
+    loadReviews(currentPage);
   }
 }
+
 
 // LOAD REVIEWS INTO PAGE
 function loadReviews(page = 1) {
@@ -419,6 +437,9 @@ async function submitReview() {
   } catch (err) {
     console.error("Could not sync review to remote sheet", err);
   }
+
+  // Refresh remote reviews after 2 seconds to sync server copy
+  setTimeout(fetchReviews, 2000);
 }
 
 function showReviewNotice(msg, isError) {
@@ -429,11 +450,10 @@ function showReviewNotice(msg, isError) {
     const form = document.querySelector('.review-form');
     if (form) form.prepend(notice);
   }
-  notice.style.cssText = `padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.85rem; margin-bottom: 0.5rem; text-align: center; animation: fadeIn 0.3s ease; ${
-    isError 
-      ? 'background: rgba(226,75,74,0.15); color: #E24B4A; border: 1px solid rgba(226,75,74,0.3);' 
-      : 'background: rgba(196,151,58,0.15); color: var(--gold); border: 1px solid rgba(196,151,58,0.3);'
-  }`;
+  notice.style.cssText = `padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.85rem; margin-bottom: 0.5rem; text-align: center; animation: fadeIn 0.3s ease; ${isError
+    ? 'background: rgba(226,75,74,0.15); color: #E24B4A; border: 1px solid rgba(226,75,74,0.3);'
+    : 'background: rgba(196,151,58,0.15); color: var(--gold); border: 1px solid rgba(196,151,58,0.3);'
+    }`;
   notice.textContent = msg;
 
   setTimeout(() => {
@@ -441,5 +461,7 @@ function showReviewNotice(msg, isError) {
   }, 4000);
 }
 
-// INITIAL LOAD
+// INITIAL LOAD & GLOBAL LIVE SYNC (POLLS EVERY 10 SECONDS)
 fetchReviews();
+setInterval(fetchReviews, 10000);
+
