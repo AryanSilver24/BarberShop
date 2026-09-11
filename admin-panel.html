@@ -92,6 +92,7 @@
         <option value="month">This Month</option>
       </select>
       <button class="refresh-btn" id="refreshBtn" onclick="loadBookings()">⟳ Refresh</button>
+      <button class="restore-btn" id="restoreBtn" onclick="restoreCompletedBookings()" style="display:none">Restore Completed (0)</button>
     </div>
 
     <!-- Status -->
@@ -106,18 +107,16 @@
         <thead>
           <tr>
             <th onclick="sortBy('ID')" data-col="ID">ID <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('Booked At')" data-col="Booked At">Booked At <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('Booked At')" data-col="Booked At" class="sorted">Booked At <span class="sort-arrow">↓</span></th>
             <th onclick="sortBy('Name')" data-col="Name">Name <span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('Email')" data-col="Email">Email <span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('Service')" data-col="Service">Service <span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('Barber')" data-col="Barber">Barber <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('Date')" data-col="Date">Appt Date <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('Time')" data-col="Time">Time <span class="sort-arrow">↕</span></th>
-            <th>Status</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr class="loading-row"><td colspan="9">Loading…</td></tr>
+          <tr class="loading-row"><td colspan="7">Loading…</td></tr>
         </tbody>
       </table>
     </div>

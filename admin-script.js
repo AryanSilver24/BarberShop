@@ -75,15 +75,62 @@ async function loadBookings() {
   btn.disabled = false; btn.textContent = '⟳ Refresh';
 }
 
+// ─── COMPLETED BOOKINGS MANAGMENT ──────────────────────────────
+function getCompletedKeys() {
+  try {
+    const saved = localStorage.getItem('completedBookings');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function markCompleted(id, name, bookedAt) {
+  const key = id || (name + '_' + bookedAt);
+  const completed = getCompletedKeys();
+  if (!completed.includes(key)) {
+    completed.push(key);
+    localStorage.setItem('completedBookings', JSON.stringify(completed));
+  }
+  computeStats();
+  renderTable();
+}
+
+function restoreCompletedBookings() {
+  if (confirm('Restore all completed bookings back to the active list?')) {
+    localStorage.removeItem('completedBookings');
+    computeStats();
+    renderTable();
+  }
+}
+
+function updateRestoreButton() {
+  const btn = document.getElementById('restoreBtn');
+  if (!btn) return;
+  const count = getCompletedKeys().length;
+  if (count > 0) {
+    btn.style.display = 'inline-block';
+    btn.textContent = `Restore Completed (${count})`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
 // ─── STATS ────────────────────────────────────────────────────
 function computeStats() {
+  const completedKeys = getCompletedKeys();
+  const activeBookings = allBookings.filter(b => {
+    const key = b['ID'] || ((b['Name']||'') + '_' + (b['Booked At']||''));
+    return !completedKeys.includes(key);
+  });
+
   const todayStr = new Date().toISOString().split('T')[0];
   const weekAgo  = new Date(Date.now() - 7*24*60*60*1000);
 
   let todayCount = 0, weekCount = 0;
   const serviceCounts = {};
 
-  allBookings.forEach(b => {
+  activeBookings.forEach(b => {
     const bookedAt = new Date(b['Booked At']);
     if (b['Date'] === todayStr) todayCount++;
     if (bookedAt >= weekAgo) weekCount++;
@@ -93,7 +140,7 @@ function computeStats() {
 
   const topService = Object.entries(serviceCounts).sort((a,b) => b[1]-a[1])[0];
 
-  document.getElementById('statTotal').textContent  = allBookings.length;
+  document.getElementById('statTotal').textContent  = activeBookings.length;
   document.getElementById('statToday').textContent  = todayCount;
   document.getElementById('statWeek').textContent   = weekCount;
   document.getElementById('statTopService').textContent = topService ? topService[0] : '—';
@@ -107,8 +154,12 @@ function renderTable() {
   const todayStr = new Date().toISOString().split('T')[0];
   const weekAgo  = new Date(Date.now() - 7*24*60*60*1000);
   const monthAgo = new Date(Date.now() - 30*24*60*60*1000);
+  const completedKeys = getCompletedKeys();
 
   filtered = allBookings.filter(b => {
+    const key = b['ID'] || ((b['Name']||'') + '_' + (b['Booked At']||''));
+    if (completedKeys.includes(key)) return false;
+
     const search = (b['Name']||'') + (b['Email']||'') + (b['Service']||'');
     if (q && !search.toLowerCase().includes(q)) return false;
     if (barber && b['Barber'] !== barber) return false;
@@ -118,15 +169,21 @@ function renderTable() {
     return true;
   });
 
-  // Sort
+  // Sort (Default: Latest booking on top)
   filtered.sort((a, b) => {
     let va = a[sortCol] || '', vb = b[sortCol] || '';
+    if (sortCol === 'Booked At') {
+      const ta = Date.parse(va) || 0;
+      const tb = Date.parse(vb) || 0;
+      if (ta !== tb) return (tb - ta) * (-sortDir);
+    }
     return va < vb ? sortDir : va > vb ? -sortDir : 0;
   });
 
   currentPage = 1;
   renderPage();
   renderPagination();
+  updateRestoreButton();
 }
 
 function renderPage() {
@@ -135,24 +192,30 @@ function renderPage() {
   const rows  = filtered.slice(start, start + PER_PAGE);
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:3rem;color:var(--muted)">
-      <div class="empty-icon">📭</div>No bookings match your filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:3rem;color:var(--muted)">
+      <div class="empty-icon">📭</div>No active bookings match your filters.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = rows.map(b => {
     const bookedAt = b['Booked At'] ? new Date(b['Booked At']).toLocaleString() : '—';
     const service  = (b['Service']||'—').split('—')[0].trim();
+    const idVal    = esc(b['ID']||'');
+    const nameVal  = esc(b['Name']||'');
+    const bookedVal= esc(b['Booked At']||'');
+
     return `<tr>
-      <td class="td-id">${b['ID']||'—'}</td>
+      <td class="td-id">${idVal || '—'}</td>
       <td style="color:var(--muted);font-size:0.78rem">${bookedAt}</td>
-      <td class="td-name">${esc(b['Name']||'—')}</td>
+      <td class="td-name">${nameVal || '—'}</td>
       <td class="td-email">${esc(b['Email']||'—')}</td>
       <td class="td-service">${esc(service)}</td>
       <td>${esc(b['Barber']||'—')}</td>
-      <td>${esc(b['Date']||'—')}</td>
-      <td>${esc(b['Time']||'—')}</td>
-      <td><span class="badge-status">Confirmed</span></td>
+      <td>
+        <button class="complete-btn" onclick="markCompleted('${idVal}', '${nameVal}', '${bookedVal}')">
+          ✓ Mark Completed
+        </button>
+      </td>
     </tr>`;
   }).join('');
 }
