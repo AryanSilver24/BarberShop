@@ -274,16 +274,24 @@ async function fetchReviews() {
       const local = getLocalReviews();
       const remoteReversed = [...remote].reverse();
       
-      const localOnly = local.filter(loc => 
-        !remoteReversed.some(rem => rem.name === loc.name && rem.text === loc.text)
-      );
+      const combined = [...local, ...remoteReversed];
+      const uniqueReviews = [];
+      const seen = new Set();
+      
+      for (const r of combined) {
+        const key = `${(r.name || '').trim().toLowerCase()}_${(r.text || '').trim().toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueReviews.push(r);
+        }
+      }
       
       const uniqueDefaults = defaultTestimonials.filter(d => 
-        !remoteReversed.some(rem => rem.text === d.text) && !localOnly.some(loc => loc.text === d.text)
+        !seen.has(`${(d.name || '').trim().toLowerCase()}_${(d.text || '').trim().toLowerCase()}`)
       );
       
-      // Newest remote reviews ALWAYS come at the very front
-      testimonials = [...remoteReversed, ...localOnly, ...uniqueDefaults];
+      // Newest reviews (local & remote) ALWAYS come at the very front
+      testimonials = [...uniqueReviews, ...uniqueDefaults];
       loadReviews(currentPage);
     } else {
       loadReviews(currentPage);
@@ -292,6 +300,7 @@ async function fetchReviews() {
     loadReviews(currentPage);
   }
 }
+
 
 
 
