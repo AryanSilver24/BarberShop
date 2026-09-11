@@ -75,35 +75,80 @@ async function loadBookings() {
   btn.disabled = false; btn.textContent = '⟳ Refresh';
 }
 
-// ─── COMPLETED BOOKINGS MANAGMENT ──────────────────────────────
+// ─── COMPLETED BOOKINGS MANAGEMENT (GLOBAL & LOCAL SYNC) ──────
 function getCompletedKeys() {
+  const keys = new Set();
   try {
     const saved = localStorage.getItem('completedBookings');
-    return saved ? JSON.parse(saved) : [];
-  } catch (e) {
-    return [];
+    if (saved) JSON.parse(saved).forEach(k => keys.add(k));
+  } catch (e) {}
+
+  if (Array.isArray(allBookings)) {
+    allBookings.forEach(b => {
+      const key = b['ID'] || ((b['Name'] || '') + '_' + (b['Booked At'] || ''));
+      if (b['Status'] === 'Completed' || b['status'] === 'Completed') {
+        keys.add(key);
+      }
+    });
   }
+
+  return Array.from(keys);
 }
 
-function markCompleted(id, name, bookedAt) {
+async function markCompleted(id, name, bookedAt) {
   const key = id || (name + '_' + bookedAt);
   const completed = getCompletedKeys();
   if (!completed.includes(key)) {
     completed.push(key);
     localStorage.setItem('completedBookings', JSON.stringify(completed));
   }
+
+  const found = allBookings.find(b => (b['ID'] && b['ID'] === id) || ((b['Name'] || '') + '_' + (b['Booked At'] || '')) === key);
+  if (found) found['Status'] = 'Completed';
+
   computeStats();
   renderTable();
+
+  if (scriptUrl) {
+    try {
+      fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markCompleted', id: id || '', name: name || '', bookedAt: bookedAt || '' })
+      });
+    } catch (e) {
+      console.error("Could not sync completion to Google Sheets", e);
+    }
+  }
 }
 
-function restoreSingleCompleted(id, name, bookedAt) {
+async function restoreSingleCompleted(id, name, bookedAt) {
   const key = id || (name + '_' + bookedAt);
   let completed = getCompletedKeys();
   completed = completed.filter(k => k !== key);
   localStorage.setItem('completedBookings', JSON.stringify(completed));
+
+  const found = allBookings.find(b => (b['ID'] && b['ID'] === id) || ((b['Name'] || '') + '_' + (b['Booked At'] || '')) === key);
+  if (found) found['Status'] = 'Active';
+
   computeStats();
   renderTable();
+
+  if (scriptUrl) {
+    try {
+      fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restoreBooking', id: id || '', name: name || '', bookedAt: bookedAt || '' })
+      });
+    } catch (e) {
+      console.error("Could not sync restore to Google Sheets", e);
+    }
+  }
 }
+
 
 function updateRestoreButton() {
   const count = getCompletedKeys().length;
