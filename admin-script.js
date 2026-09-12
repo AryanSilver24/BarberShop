@@ -49,6 +49,59 @@ function init() {
   }
 }
 
+// ─── DATA NORMALIZATION (HANDLES SHIFTED/MISALIGNED DATA) ──────
+function normalizeBooking(b) {
+  if (!b) return b;
+
+  const isShifted = (
+    (typeof b['Name'] === 'string' && b['Name'].includes('@')) ||
+    (typeof b['Email'] === 'string' && (b['Email'].includes('—') || b['Email'].includes('$') || /cut|shave|trim|fade/i.test(b['Email']))) ||
+    (typeof b['Booked At'] === 'string' && !b['Booked At'].includes('T') && !b['Booked At'].includes('-') && isNaN(Date.parse(b['Booked At'])))
+  );
+
+  if (isShifted) {
+    const rawId = b['ID'] || '';
+    const rawBookedAt = (rawId && !isNaN(Date.parse(rawId))) ? rawId : (b['Booked At'] || '');
+    const realName = b['Booked At'] || b['name'] || '';
+    const realEmail = b['Name'] || b['email'] || '';
+    const realService = b['Email'] || b['service'] || '';
+    const realBarber = b['Service'] || b['barber'] || '';
+    const realDate = b['Barber'] || b['Date'] || '';
+    const realTime = b['Date'] || b['Time'] || '';
+    const realStatus = (b[''] === 'Active' || b[''] === 'Completed') ? b[''] : (b['Status'] === 'Completed' ? 'Completed' : 'Active');
+
+    const cleanId = (rawId && rawId.includes('T'))
+      ? 'BK' + Date.parse(rawId)
+      : (rawId || ('BK' + Date.now()));
+
+    return {
+      'ID': cleanId,
+      'Booked At': rawBookedAt,
+      'Name': realName,
+      'Email': realEmail,
+      'Service': realService,
+      'Barber': realBarber,
+      'Date': realDate,
+      'Time': realTime,
+      'Status': realStatus,
+      'Price': b['finalPrice'] || b['Price'] || undefined
+    };
+  }
+
+  return {
+    'ID': b['ID'] || b['id'] || ('BK' + Date.now()),
+    'Booked At': b['Booked At'] || b['bookedAt'] || b['Date'] || '',
+    'Name': b['Name'] || b['name'] || '',
+    'Email': b['Email'] || b['email'] || '',
+    'Service': b['Service'] || b['service'] || '',
+    'Barber': b['Barber'] || b['barber'] || 'Any',
+    'Date': b['Date'] || b['date'] || '',
+    'Time': b['Time'] || b['time'] || '',
+    'Status': b['Status'] || b['status'] || 'Active',
+    'Price': b['Price'] || b['finalPrice'] || undefined
+  };
+}
+
 // ─── LOAD BOOKINGS ────────────────────────────────────────────
 async function loadBookings() {
   if (!scriptUrl) return;
@@ -60,7 +113,7 @@ async function loadBookings() {
     const res  = await fetch(scriptUrl + '?action=getBookings');
     const data = await res.json();
     if (data.status === 'ok') {
-      allBookings = data.bookings.reverse(); // newest first
+      allBookings = (data.bookings || []).map(normalizeBooking).reverse(); // newest first
       computeStats();
       renderTable();
       setStatus('Live — ' + allBookings.length + ' bookings loaded · ' + new Date().toLocaleTimeString(), true);
@@ -291,9 +344,9 @@ function renderTable() {
     const search = (b['Name']||'') + (b['Email']||'') + (b['Service']||'');
     if (q && !search.toLowerCase().includes(q)) return false;
     if (barber && b['Barber'] !== barber) return false;
-    if (dRange === 'today' && b['Date'] !== todayStr) return false;
-    if (dRange === 'week' && new Date(b['Date']) < weekAgo) return false;
-    if (dRange === 'month' && new Date(b['Date']) < monthAgo) return false;
+    if (dRange === 'today' && (b['Date']||'').split('T')[0] !== todayStr) return false;
+    if (dRange === 'week' && new Date(b['Date'] || b['Booked At']) < weekAgo) return false;
+    if (dRange === 'month' && new Date(b['Date'] || b['Booked At']) < monthAgo) return false;
     return true;
   });
 
@@ -327,7 +380,9 @@ function renderPage() {
   }
 
   tbody.innerHTML = rows.map(b => {
-    const bookedAt = b['Booked At'] ? new Date(b['Booked At']).toLocaleString() : '—';
+    const rawDate  = b['Booked At'];
+    const parsed   = rawDate ? new Date(rawDate) : null;
+    const bookedAt = (parsed && !isNaN(parsed.getTime())) ? parsed.toLocaleString() : (rawDate || '—');
     const service  = (b['Service']||'—').split('—')[0].trim();
     const idVal    = esc(b['ID']||'');
     const nameVal  = esc(b['Name']||'');

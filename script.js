@@ -165,18 +165,32 @@ async function handleBooking() {
   }
   const finalPrice = Math.max(0, basePrice - discount);
 
+  const bookingId = 'BK' + Date.now();
+  const bookedAtIso = new Date().toISOString();
+
   const payload = {
+    id: bookingId,
+    ID: bookingId,
+    bookedAt: bookedAtIso,
+    'Booked At': bookedAtIso,
     name: fname + ' ' + lname,
+    Name: fname + ' ' + lname,
     email,
+    Email: email,
     service,
+    Service: service,
     barber,
+    Barber: barber,
     date,
+    Date: date,
     time,
+    Time: time,
     basePrice,
     promoCode: activePromo || 'NONE',
     discountAmount: discount,
     finalPrice,
-    bookedAt: new Date().toISOString()
+    status: 'Active',
+    Status: 'Active'
   };
 
   if (!APPS_SCRIPT_URL) {
